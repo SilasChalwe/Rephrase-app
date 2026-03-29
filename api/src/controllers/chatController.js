@@ -30,8 +30,22 @@ const sendMediaMessage = async (req, res) => {
 
 const getChatHistory = async (req, res) => {
   try {
+    const { anchorMessageId = '', beforeMessageId = '', afterMessageId = '', windowSize, batchSize } =
+      req.query;
+
+    if (anchorMessageId || beforeMessageId || afterMessageId || windowSize || batchSize) {
+      const historyWindow = await chatService.loadChatHistoryWindowByUsers(req.user.uid, req.params.receiverId, {
+        anchorMessageId,
+        beforeMessageId,
+        afterMessageId,
+        windowSize,
+        batchSize,
+      });
+      return res.json(historyWindow);
+    }
+
     const messages = await chatService.loadChatHistoryByUsers(req.user.uid, req.params.receiverId);
-    return res.json(messages);
+    return res.json({ messages, hasOlder: messages.length >= 100, hasNewer: false });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to load chat history.' });
   }

@@ -52,6 +52,33 @@ const sendMediaMessage = async (senderId, receiverId, mediaUrl, mediaType) =>
     type: mediaType,
   });
 
+const getMessageById = async (chatKey, messageId) => {
+  if (!messageId) {
+    return null;
+  }
+
+  const snapshot = await getMessagesRef(chatKey).child(messageId).once('value');
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return normalizeChatMessage(snapshot.key, snapshot.val());
+};
+
+const dedupeMessages = (messages) => {
+  const seenIds = new Set();
+
+  return messages.filter((message) => {
+    const messageId = String(message.messageId || '');
+    if (!messageId || seenIds.has(messageId)) {
+      return false;
+    }
+
+    seenIds.add(messageId);
+    return true;
+  });
+};
+
 const loadChatHistoryByUsers = async (userId, otherUserId, limit = 100) => {
   const chatKey = generateChatKey(userId, otherUserId);
   const snapshot = await getMessagesRef(chatKey)
@@ -60,6 +87,96 @@ const loadChatHistoryByUsers = async (userId, otherUserId, limit = 100) => {
     .once('value');
 
   return mapSnapshotToMessages(snapshot);
+};
+
+const loadChatHistoryWindowByUsers = async (
+  userId,
+  otherUserId,
+  { anchorMessageId = '', beforeMessageId = '', afterMessageId = '', windowSize = 10, batchSize = 24 } = {}
+) => {
+  const chatKey = generateChatKey(userId, otherUserId);
+  const safeWindowSize = Math.max(1, Math.min(Number(windowSize || 10), 40));
+  const safeBatchSize = Math.max(1, Math.min(Number(batchSize || 24), 60));
+
+  if (beforeMessageId) {
+    const boundaryMessage = await getMessageById(chatKey, beforeMessageId);
+    if (!boundaryMessage) {
+      return { messages: [], hasOlder: false, hasNewer: true };
+    }
+
+    const snapshot = await getMessagesRef(chatKey)
+      .orderByChild('timestamp')
+      .endAt(boundaryMessage.timestamp - 1)
+      .limitToLast(safeBatchSize + 1)
+      .once('value');
+
+    const messages = mapSnapshotToMessages(snapshot);
+    return {
+      messages: messages.slice(-safeBatchSize),
+      hasOlder: messages.length > safeBatchSize,
+      hasNewer: true,
+    };
+  }
+
+  if (afterMessageId) {
+    const boundaryMessage = await getMessageById(chatKey, afterMessageId);
+    if (!boundaryMessage) {
+      return { messages: [], hasOlder: true, hasNewer: false };
+    }
+
+    const snapshot = await getMessagesRef(chatKey)
+      .orderByChild('timestamp')
+      .startAt(boundaryMessage.timestamp + 1)
+      .limitToFirst(safeBatchSize + 1)
+      .once('value');
+
+    const messages = mapSnapshotToMessages(snapshot);
+    return {
+      messages: messages.slice(0, safeBatchSize),
+      hasOlder: true,
+      hasNewer: messages.length > safeBatchSize,
+    };
+  }
+
+  const anchorMessage = await getMessageById(chatKey, anchorMessageId);
+
+  if (anchorMessage) {
+    const beforeCount = Math.max(safeWindowSize - 1, 0);
+    const [beforeSnapshot, afterSnapshot] = await Promise.all([
+      getMessagesRef(chatKey)
+        .orderByChild('timestamp')
+        .endAt(anchorMessage.timestamp)
+        .limitToLast(beforeCount + 1)
+        .once('value'),
+      getMessagesRef(chatKey)
+        .orderByChild('timestamp')
+        .startAt(anchorMessage.timestamp + 1)
+        .limitToFirst(1)
+        .once('value'),
+    ]);
+
+    const beforeMessages = mapSnapshotToMessages(beforeSnapshot);
+    const afterMessages = mapSnapshotToMessages(afterSnapshot);
+    const messages = dedupeMessages([...beforeMessages, ...afterMessages]).slice(-safeWindowSize);
+
+    return {
+      messages,
+      hasOlder: beforeMessages.length > beforeCount,
+      hasNewer: afterMessages.length > 0,
+    };
+  }
+
+  const latestSnapshot = await getMessagesRef(chatKey)
+    .orderByChild('timestamp')
+    .limitToLast(safeWindowSize + 1)
+    .once('value');
+
+  const latestMessages = mapSnapshotToMessages(latestSnapshot);
+  return {
+    messages: latestMessages.slice(-safeWindowSize),
+    hasOlder: latestMessages.length > safeWindowSize,
+    hasNewer: false,
+  };
 };
 
 const buildConversationSummary = async (currentUserId, friend) => {
@@ -178,6 +295,7 @@ module.exports = {
   isUserOnline,
   listenForMessages,
   loadChatHistoryByUsers,
+  loadChatHistoryWindowByUsers,
   markConversationAsRead,
   sendMediaMessage,
   sendTextMessage,
