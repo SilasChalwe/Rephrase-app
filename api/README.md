@@ -40,7 +40,7 @@ The local server listens on `http://localhost:8080` by default.
 
 ## Vercel deployment
 
-Deploy the `api` folder as its own Vercel project root. The serverless entrypoint is [index.js](/home/silas/repo/Rephrase-app/api/index.js), which exports the Express app for Vercel Functions.
+Deploy the `api` folder as its own Vercel project root. The serverless entrypoint is [index.js](/home/silas/repo/Rephrase-app/api/api/index.js), which exports the Express app for Vercel Functions.
 
 Set these Vercel environment variables:
 
