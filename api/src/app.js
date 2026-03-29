@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const swaggerUi = require('swagger-ui-express');
 
 const env = require('./config/env');
 const { createOpenApiSpec } = require('./config/swagger');
@@ -39,17 +38,65 @@ app.get('/openapi.json', (req, res) => {
   res.json(createOpenApiSpec(getBaseUrl(req)));
 });
 
-app.use('/docs', swaggerUi.serve);
-app.get(
-  ['/docs', '/docs/'],
-  swaggerUi.setup(null, {
-    explorer: true,
-    swaggerOptions: {
-      url: '/openapi.json',
-    },
-    customSiteTitle: 'Rephrase API Docs',
-  })
-);
+app.get(['/docs', '/docs/'], (req, res) => {
+  res.status(200).send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rephrase API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <style>
+      html {
+        box-sizing: border-box;
+        overflow-y: scroll;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+      body {
+        margin: 0;
+        background: #f5f7fb;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 24px;
+        background: #130320;
+        color: #f6f0ff;
+        font-family: Arial, sans-serif;
+      }
+      .topbar strong {
+        font-size: 18px;
+      }
+      .topbar a {
+        color: #ffb47a;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <strong>Rephrase API Docs</strong>
+      <a href="/">Back To Home</a>
+    </div>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: 'BaseLayout'
+      });
+    </script>
+  </body>
+</html>`);
+});
 
 app.get('/', (req, res) => {
   res.status(200).send(`<!doctype html>
