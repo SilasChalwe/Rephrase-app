@@ -9,13 +9,10 @@ export const APP_CONFIG = {
   apiBaseUrl: sanitizeBaseUrl(extra.apiBaseUrl),
   firebase: {
     apiKey: firebase.apiKey ?? '',
-    authDomain: firebase.authDomain ?? '',
     databaseURL: firebase.databaseURL ?? '',
     projectId: firebase.projectId ?? '',
-    storageBucket: firebase.storageBucket ?? '',
     messagingSenderId: firebase.messagingSenderId ?? '',
     appId: firebase.appId ?? '',
-    measurementId: firebase.measurementId ?? '',
   },
 };
 

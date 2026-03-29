@@ -2,8 +2,12 @@ const chatService = require('../services/chatService');
 
 const sendTextMessage = async (req, res) => {
   try {
-    await chatService.sendTextMessage(req.user.uid, req.body.receiverId, req.body.text);
-    return res.status(200).send();
+    const message = await chatService.sendTextMessage(
+      req.user.uid,
+      req.body.receiverId,
+      req.body.text
+    );
+    return res.status(200).json(message);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to send text message.' });
   }
@@ -11,14 +15,14 @@ const sendTextMessage = async (req, res) => {
 
 const sendMediaMessage = async (req, res) => {
   try {
-    await chatService.sendMediaMessage(
+    const message = await chatService.sendMediaMessage(
       req.user.uid,
       req.body.receiverId,
       req.body.mediaUrl,
       req.body.mediaType
     );
 
-    return res.status(200).send();
+    return res.status(200).json(message);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to send media message.' });
   }
@@ -94,8 +98,8 @@ const messageStream = (req, res) => {
   const unsubscribe = chatService.listenForMessages(
     currentUserId,
     otherUserId,
-    (message) => {
-      res.write(`data: ${JSON.stringify(message)}\n\n`);
+    (messages) => {
+      res.write(`data: ${JSON.stringify(messages)}\n\n`);
     },
     (error) => {
       res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);

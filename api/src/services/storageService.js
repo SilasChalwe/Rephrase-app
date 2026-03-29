@@ -15,7 +15,7 @@ const resolveFileExtension = (originalName) => {
 const toArrayBuffer = (buffer) =>
   buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 
-const getVercelBlobToken = () => env.storageReadWriteToken || process.env.BLOB_READ_WRITE_TOKEN || '';
+const getVercelBlobToken = () => env.readWriteToken || '';
 
 const loadVercelBlob = () => {
   try {
@@ -36,9 +36,7 @@ const uploadUserProfileImage = async ({ userId, file }) => {
 
   const token = getVercelBlobToken();
   if (!token) {
-    throw new Error(
-      'BLOB_READ_WRITE_TOKEN or STORAGE_READ_WRITE_TOKEN must be configured for uploads.'
-    );
+    throw new Error('BLOB_READ_WRITE_TOKEN or _READ_WRITE_TOKEN must be configured for uploads.');
   }
 
   const { put } = loadVercelBlob();

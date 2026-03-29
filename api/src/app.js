@@ -27,6 +27,169 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/', (req, res) => {
+  res.status(200).send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Covian Hive Rephrase API</title>
+    <link rel="icon" href="https://www.covianhive.me/favicon.png" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #130320;
+        --panel: rgba(255, 255, 255, 0.08);
+        --text: #f6f0ff;
+        --muted: #d5c7eb;
+        --accent: #ff7a1a;
+        --line: rgba(255, 255, 255, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(255, 122, 26, 0.28), transparent 36%),
+          radial-gradient(circle at bottom right, rgba(109, 40, 217, 0.22), transparent 32%),
+          linear-gradient(160deg, #1b0333 0%, var(--bg) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: min(720px, 100%);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        backdrop-filter: blur(14px);
+        padding: 32px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .brand img {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.94);
+        padding: 8px;
+      }
+      .brand-copy {
+        text-align: left;
+      }
+      .brand-copy small {
+        display: block;
+        color: var(--muted);
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
+      .brand-copy strong {
+        font-size: 20px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 999px;
+        padding: 8px 14px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.18);
+      }
+      h1 {
+        margin: 18px 0 10px;
+        font-size: clamp(32px, 6vw, 56px);
+        line-height: 1;
+      }
+      p {
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.7;
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        margin-top: 22px;
+      }
+      .item {
+        border-radius: 18px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .item strong {
+        display: block;
+        margin-bottom: 8px;
+        color: white;
+      }
+      code {
+        color: #ffd3b0;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="brand">
+        <img src="https://www.covianhive.me/images/logo-icon.png" alt="Covian Hive logo" />
+        <div class="brand-copy">
+          <small>Covian Hive</small>
+          <strong>Rephrase Backend</strong>
+        </div>
+      </div>
+      <div class="badge"><span class="dot"></span> Rephrase API is live</div>
+      <h1>Welcome To Covian Hive App</h1>
+      <p>
+        The server is running and ready. This backend powers authentication, friends, uploads,
+        Firestore user data, and realtime chat for Rephrase.
+      </p>
+      <div class="grid">
+        <section class="item">
+          <strong>Health</strong>
+          <code>GET /health</code>
+        </section>
+        <section class="item">
+          <strong>Auth Base</strong>
+          <code>/api/auth</code>
+        </section>
+        <section class="item">
+          <strong>Chat Base</strong>
+          <code>/api/chat</code>
+        </section>
+        <section class="item">
+          <strong>Public Search</strong>
+          <code>/api/public/users/search?q=...</code>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>`);
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });

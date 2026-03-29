@@ -6,18 +6,8 @@ const admin = require('firebase-admin');
 const env = require('./env');
 
 const resolveServiceAccount = () => {
-  if (env.firebaseServiceAccountJson) {
-    try {
-      return JSON.parse(env.firebaseServiceAccountJson);
-    } catch (error) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON contains invalid JSON.');
-    }
-  }
-
   if (!env.firebaseServiceAccountPath) {
-    throw new Error(
-      'Set FIREBASE_SERVICE_ACCOUNT_PATH, FIREBASE_SERVICE_ACCOUNT_JSON, or FIREBASE_SERVICE_ACCOUNT_JSON_AES256 in the backend environment.'
-    );
+    throw new Error('Set FIREBASE_SERVICE_ACCOUNT_PATH in the backend environment.');
   }
 
   const serviceAccountPath = path.isAbsolute(env.firebaseServiceAccountPath)
@@ -49,5 +39,6 @@ if (!admin.apps.length) {
 module.exports = {
   admin,
   auth: admin.auth(),
+  database: admin.database(),
   firestore: admin.firestore(),
 };

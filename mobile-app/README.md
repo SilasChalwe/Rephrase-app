@@ -7,6 +7,7 @@ This folder contains the Expo/React Native frontend for Rephrase.
 1. Copy `setting.env.example` to `setting.env`.
 2. Set `API_BASE_URL` to the Express API you want the app to use.
 3. Fill in the Firebase client values used for authentication.
+4. Set `FIREBASE_DATABASE_URL` to your Firebase Realtime Database URL for live chat updates.
 
 ## Run
 
@@ -26,6 +27,11 @@ This app is currently using the JavaScript Firebase SDK from [mobile-app/firebas
 - There is no `android/` Gradle project in the repo right now, so there is no `build.gradle` file to edit manually.
 
 If you later run `expo prebuild` or create a native Android folder, use package name `com.covianhive.rephrase` and then add the Google services Gradle plugin plus Firebase dependencies in the generated Gradle files.
+
+## Firebase data split
+
+- Firestore-backed API routes are used for user profiles, friend lists, and friend requests.
+- Firebase Realtime Database is used directly by the chat screen for live messages, presence, and read or delivery updates.
 
 ## Tag Builds
 

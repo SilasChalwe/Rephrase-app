@@ -1,142 +1,176 @@
-
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
-import {custom_colors} from '../utilities/colors'
-import { buildApiUrl, getStoredUser } from '../../lib/api';
 
-// Chat screen with improved state, edge case handling, and timestamps
+import { custom_colors } from '../utilities/colors';
+import { buildApiUrl, getStoredUser } from '../../lib/api';
+import { subscribeToConversationMessages } from '../../lib/realtimeChat';
+
 const ChatScreen = () => {
-  const { userId, name ,avatar} = useLocalSearchParams();
-  const [id, setId] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { userId, name, avatar } = useLocalSearchParams();
+  const [session, setSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const flatListRef = useRef(null);
+  const markReadInFlightRef = useRef(false);
 
-  // Load current user info on screen focus
-  useFocusEffect(useCallback(() => {
-    const init = async () => {
-      const user = await getStoredUser();
-      if (user) {
-        setId(user.uid);
-        await fetchMessages(user.token);
-      }
-    };
-    init();
-  }, [userId]));
+  const otherUserId = String(userId || '');
 
-  // Fetch messages for this conversation
-  const fetchMessages = async (token) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(buildApiUrl(`/api/chat/messages/${userId}`), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+  useFocusEffect(
+    React.useCallback(() => {
+      let unsubscribeMessages = () => {};
+      let isActive = true;
+
+      const initializeChat = async () => {
+        const user = await getStoredUser();
+
+        if (!isActive || !user?.uid || !user?.token || !otherUserId) {
+          setIsLoading(false);
+          return;
         }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setChatMessages(data);
-      } else {
-        console.warn("Failed to fetch messages");
-      }
-    } catch (err) {
-      console.error("Error fetching messages:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  // Send a new message and update state
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
-    const user = await getStoredUser();
+        setSession(user);
+        setIsLoading(true);
 
-    if (!user?.token) {
+        unsubscribeMessages = subscribeToConversationMessages(
+          user.uid,
+          otherUserId,
+          async (messages) => {
+            if (!isActive) {
+              return;
+            }
+
+            setChatMessages(messages);
+            setIsLoading(false);
+
+            const hasUnreadIncomingMessages = messages.some(
+              (message) =>
+                message.senderId === otherUserId &&
+                message.receiverId === user.uid &&
+                message.status !== 'READ'
+            );
+
+            if (!hasUnreadIncomingMessages || markReadInFlightRef.current) {
+              return;
+            }
+
+            markReadInFlightRef.current = true;
+
+            try {
+              await fetch(buildApiUrl(`/api/chat/conversations/read?id=${otherUserId}`), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${user.token}`,
+                },
+              });
+            } catch (error) {
+              console.warn('Failed to mark conversation as read:', error);
+            } finally {
+              markReadInFlightRef.current = false;
+            }
+          },
+          (error) => {
+            console.error('Realtime message subscription failed:', error);
+            if (isActive) {
+              setIsLoading(false);
+            }
+          }
+        );
+      };
+
+      initializeChat();
+
+      return () => {
+        isActive = false;
+        unsubscribeMessages();
+      };
+    }, [otherUserId])
+  );
+
+  useEffect(() => {
+    if (!chatMessages.length) {
       return;
     }
 
-    const token = user.token;
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [chatMessages]);
 
-    const newMessage = {
-      senderId: id,
-      receiverId: userId,
-      message: inputText,
-      mediaUrl: null,
-      messageId: `msg_${Date.now()}`,
-      status: 'SENT',
-      timestamp: Date.now(),
-      type: 'TEXT'
-    };
+  const handleSend = async () => {
+    const trimmedMessage = inputText.trim();
+
+    if (!trimmedMessage || !session?.token || !otherUserId || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setInputText('');
 
     try {
-      setChatMessages((prev) => [...prev, newMessage]); // Optimistically add message
-      setInputText('');
-
       const response = await fetch(buildApiUrl('/api/chat/messages/text'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({
-          receiverId: userId,
-          senderId: id,
-          text: newMessage.message,
-        })
+          receiverId: otherUserId,
+          text: trimmedMessage,
+        }),
       });
 
       if (!response.ok) {
-        console.warn("Message failed to send");
+        throw new Error('Message failed to send.');
       }
-    } catch (err) {
-      console.error("Send error:", err);
+    } catch (error) {
+      console.error('Send error:', error);
+      setInputText(trimmedMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
-  // Sort messages by timestamp
-  const sortedMessages = useMemo(() => {
-    return [...chatMessages].sort((a, b) => a.timestamp - b.timestamp);
-  }, [chatMessages]);
+  const sortedMessages = useMemo(
+    () => [...chatMessages].sort((left, right) => left.timestamp - right.timestamp),
+    [chatMessages]
+  );
 
-  // Format date/time display
-  const formatTime = (ts) => {
-    const date = new Date(ts);
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return `${date.getHours().toString().padStart(2, '0')}:${date
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}`;
   };
 
-  const formatDate = (ts) => {
-    const date = new Date(ts);
-    return date.toDateString();
-  };
+  const formatDate = (timestamp) => new Date(timestamp).toDateString();
 
-  // Render individual message bubble
   const renderMessage = ({ item, index }) => {
-    const isMine = item.senderId === id;
+    const isMine = item.senderId === session?.uid;
     const showDate =
       index === 0 || formatDate(item.timestamp) !== formatDate(sortedMessages[index - 1]?.timestamp);
 
     return (
       <>
-        {showDate && (
-          <Text style={styles.dateLabel}>{formatDate(item.timestamp)}</Text>
-        )}
+        {showDate ? <Text style={styles.dateLabel}>{formatDate(item.timestamp)}</Text> : null}
         <View style={[styles.messageContainer, isMine ? styles.mine : styles.theirs]}>
-          {!isMine && <Text style={styles.senderName}>{name}</Text>}
+          {!isMine ? <Text style={styles.senderName}>{name}</Text> : null}
           <Text style={styles.messageText}>{item.message}</Text>
           <Text style={styles.timeStamp}>{formatTime(item.timestamp)}</Text>
         </View>
@@ -148,44 +182,58 @@ const ChatScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Image source={require("../assets/icons/chatbg.png")} style={styles.imageBg} />
+      <Image source={require('../assets/icons/chatbg.png')} style={styles.imageBg} />
 
-      {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image style={{tintColor:'#ffff'}} source={require("../assets/icons/left-arrow.png")} resizeMode='contain' />
+          <Image
+            style={{ tintColor: '#ffff' }}
+            source={require('../assets/icons/left-arrow.png')}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
         <View style={styles.profileContainer}>
-          <Image source={ avatar ? {uri:avatar}:require('../assets/icons/profile.png')}
-           style={[avatar? styles.profileImage:{width:40,height:40}]} resizeMode='contain' />
+          <Image
+            source={avatar ? { uri: avatar } : require('../assets/icons/profile.png')}
+            style={avatar ? styles.profileImage : { width: 40, height: 40 }}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.nameText}>{name}</Text>
       </View>
 
-      {/* Chat messages */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {isLoading ? (
           <ActivityIndicator size="large" color="#8686DB" style={styles.loadingIndicator} />
         ) : (
           <FlatList
+            ref={flatListRef}
             data={sortedMessages}
             keyExtractor={(item) => item.messageId}
             renderItem={renderMessage}
             contentContainerStyle={styles.chatContainer}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           />
         )}
       </KeyboardAvoidingView>
 
-      {/* Input box */}
       <View style={styles.inputContainer}>
         <TextInput
           value={inputText}
           onChangeText={setInputText}
           placeholder="Type a message..."
           style={styles.input}
+          editable={!isSending}
         />
-        <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-          <Text style={{ color: 'white' }}>Send</Text>
+        <TouchableOpacity
+          onPress={handleSend}
+          style={[styles.sendButton, isSending ? styles.sendButtonDisabled : null]}
+          disabled={isSending}
+        >
+          <Text style={{ color: 'white' }}>{isSending ? '...' : 'Send'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -193,6 +241,7 @@ const ChatScreen = () => {
 };
 
 export default ChatScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -307,7 +356,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#ccc',
   },
-  
   input: {
     flex: 1,
     height: 40,
@@ -325,6 +373,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sendButtonDisabled: {
+    opacity: 0.7,
+  },
   loadingIndicator: {
     position: 'absolute',
     top: '50%',
@@ -334,4 +385,3 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
 });
- 

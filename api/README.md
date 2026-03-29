@@ -9,6 +9,7 @@ This folder contains the Express backend for Rephrase. It is now set up for Verc
 - Firebase Admin SDK
 - Firestore
 - Vercel Blob
+- Firebase Realtime Database for chat, presence, and typing
 - Multer for uploads
 
 ## Local setup
@@ -25,10 +26,9 @@ npm install
 cp .env.example .env
 ```
 
-3. For local Firebase Admin auth, either:
+3. For Firebase Admin auth:
 
-- point `FIREBASE_SERVICE_ACCOUNT_PATH` at a local service-account JSON file, or
-- paste the JSON into `FIREBASE_SERVICE_ACCOUNT_JSON`
+- point `FIREBASE_SERVICE_ACCOUNT_PATH` at a local service-account JSON file
 
 4. Start the API:
 
@@ -44,44 +44,24 @@ Deploy the `api` folder as its own Vercel project root. The serverless entrypoin
 
 Set these Vercel environment variables:
 
-- `FIREBASE_SERVICE_ACCOUNT_JSON` or `FIREBASE_SERVICE_ACCOUNT_JSON_AES256`
-- `AES_256_SECRET_KEY_HEX` if you use the encrypted Firebase JSON value
+- `FIREBASE_SERVICE_ACCOUNT_PATH`
 - `FIREBASE_DATABASE_URL` if your project uses Realtime Database
 - `STORAGE_PROVIDER=vercel-blob`
 - `STORAGE_ACCESS=public`
-- `BLOB_READ_WRITE_TOKEN` or `STORAGE_READ_WRITE_TOKEN`
+- `BLOB_READ_WRITE_TOKEN` or `_READ_WRITE_TOKEN`
 
-When you connect a Vercel Blob store to the project, Vercel normally adds `BLOB_READ_WRITE_TOKEN` for you.
-
-## AES-256-GCM secrets
-
-The backend can decrypt AES-256-GCM env values for:
-
-- `FIREBASE_SERVICE_ACCOUNT_JSON_AES256`
-- `STORAGE_READ_WRITE_TOKEN_AES256`
-
-Generate an encrypted value from a plain string:
-
-```bash
-node scripts/aes256-secret.js "secret value" --generate-key
-```
-
-Generate an encrypted value from the full Firebase Admin JSON file content:
-
-```bash
-node scripts/aes256-secret.js --file=/path/to/serviceAccountKey.json --generate-key
-```
-
-Then paste the output into Vercel:
-
-- `AES_256_SECRET_KEY_HEX=...`
-- `FIREBASE_SERVICE_ACCOUNT_JSON_AES256=...`
+Vercel usually gives you `BLOB_READ_WRITE_TOKEN` automatically. The backend also accepts `_READ_WRITE_TOKEN` if you prefer the shorter alias.
 
 ## Upload notes
 
 - Profile image uploads now use Vercel Blob only.
 - The current app stores profile image URLs directly on the user record, so `STORAGE_ACCESS=public` is the correct setting.
 - Vercel Functions accept request bodies up to 4.5 MB, so keep `MAX_UPLOAD_SIZE_MB=4` or lower.
+
+## Firebase data split
+
+- Firestore stores user profiles, friend lists, and friend requests.
+- Realtime Database stores chat messages, presence, typing, and message read or delivery status.
 
 ## Key routes
 
