@@ -92,6 +92,7 @@ app.get('/', (req, res) => {
         backdrop-filter: blur(14px);
         padding: 32px;
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+        position: relative;
       }
       .brand {
         display: inline-flex;
@@ -129,6 +130,9 @@ app.get('/', (req, res) => {
         background: rgba(255, 255, 255, 0.1);
         color: var(--muted);
         font-size: 14px;
+        position: absolute;
+        top: 24px;
+        right: 24px;
       }
       .dot {
         width: 10px;
@@ -148,28 +152,6 @@ app.get('/', (req, res) => {
         font-size: 16px;
         line-height: 1.7;
       }
-      .grid {
-        display: grid;
-        gap: 14px;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        margin-top: 22px;
-      }
-      .item {
-        border-radius: 18px;
-        padding: 18px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .item strong {
-        display: block;
-        margin-bottom: 8px;
-        color: white;
-      }
-      code {
-        color: #ffd3b0;
-        font-family: monospace;
-        font-size: 14px;
-      }
       a {
         color: var(--accent);
         text-decoration: none;
@@ -178,6 +160,7 @@ app.get('/', (req, res) => {
   </head>
   <body>
     <main class="card">
+      <div class="badge"><span class="dot"></span> Rephrase API is live</div>
       <div class="brand">
         <img src="https://www.covianhive.me/images/logo-icon.png" alt="Covian Hive logo" />
         <div class="brand-copy">
@@ -185,34 +168,8 @@ app.get('/', (req, res) => {
           <strong>Rephrase Backend</strong>
         </div>
       </div>
-      <div class="badge"><span class="dot"></span> Rephrase API is live</div>
       <h1>Welcome To Covian Hive App</h1>
-      <p>
-        The server is running and ready. This backend powers authentication, friends, uploads,
-        Firestore user data, and realtime chat for Rephrase.
-      </p>
-      <div class="grid">
-        <section class="item">
-          <strong>Health</strong>
-          <code>GET /health</code>
-        </section>
-        <section class="item">
-          <strong>Auth Base</strong>
-          <code>/api/auth</code>
-        </section>
-        <section class="item">
-          <strong>Chat Base</strong>
-          <code>/api/chat</code>
-        </section>
-        <section class="item">
-          <strong>Public Search</strong>
-          <code>/api/public/users/search?q=...</code>
-        </section>
-        <section class="item">
-          <strong>Swagger Docs</strong>
-          <a href="/docs">/docs</a>
-        </section>
-      </div>
+      <p><a href="/docs">Open API Docs</a></p>
     </main>
   </body>
 </html>`);
