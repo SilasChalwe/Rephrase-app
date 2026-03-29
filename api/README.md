@@ -11,6 +11,7 @@ This folder contains the Express backend for Rephrase. It is now set up for Verc
 - Vercel Blob
 - Firebase Realtime Database for chat, presence, and typing
 - Multer for uploads
+- Swagger UI at `/docs`
 
 ## Local setup
 
@@ -37,6 +38,8 @@ npm run dev
 ```
 
 The local server listens on `http://localhost:8080` by default.
+
+Swagger docs are available at `http://localhost:8080/docs` and the raw OpenAPI document is available at `http://localhost:8080/openapi.json`.
 
 ## Vercel deployment
 
@@ -65,6 +68,9 @@ Base64 is only an encoding format for easier env pasting, not encryption.
 - Realtime Database stores chat messages, presence, typing, and message read or delivery status.
 
 ## Key routes
+
+- `GET /docs`
+- `GET /openapi.json`
 
 - `POST /api/auth/register`
 - `GET /api/auth/me`

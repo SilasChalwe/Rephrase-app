@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
 
 const env = require('./config/env');
+const { createOpenApiSpec } = require('./config/swagger');
 const authRoutes = require('./routes/authRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const friendsRoutes = require('./routes/friendsRoutes');
@@ -9,6 +11,12 @@ const mediaRoutes = require('./routes/mediaRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
+
+const getBaseUrl = (req) => {
+  const forwardedProtocol = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const protocol = forwardedProtocol || req.protocol || 'https';
+  return `${protocol}://${req.get('host')}`;
+};
 
 app.use(
   cors({
@@ -26,6 +34,22 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get('/openapi.json', (req, res) => {
+  res.json(createOpenApiSpec(getBaseUrl(req)));
+});
+
+app.use('/docs', swaggerUi.serve);
+app.get(
+  ['/docs', '/docs/'],
+  swaggerUi.setup(null, {
+    explorer: true,
+    swaggerOptions: {
+      url: '/openapi.json',
+    },
+    customSiteTitle: 'Rephrase API Docs',
+  })
+);
 
 app.get('/', (req, res) => {
   res.status(200).send(`<!doctype html>
@@ -183,6 +207,10 @@ app.get('/', (req, res) => {
         <section class="item">
           <strong>Public Search</strong>
           <code>/api/public/users/search?q=...</code>
+        </section>
+        <section class="item">
+          <strong>Swagger Docs</strong>
+          <a href="/docs">/docs</a>
         </section>
       </div>
     </main>
