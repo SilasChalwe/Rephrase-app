@@ -1,24 +1,18 @@
-const fs = require('fs');
-const path = require('path');
-
 const admin = require('firebase-admin');
 
 const env = require('./env');
 
 const resolveServiceAccount = () => {
-  if (!env.firebaseServiceAccountPath) {
-    throw new Error('Set FIREBASE_SERVICE_ACCOUNT_PATH in the backend environment.');
+  if (env.firebaseServiceAccountJsonBase64) {
+    try {
+      const decodedJson = Buffer.from(env.firebaseServiceAccountJsonBase64, 'base64').toString('utf8');
+      return JSON.parse(decodedJson);
+    } catch (error) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 must contain valid base64-encoded JSON.');
+    }
   }
 
-  const serviceAccountPath = path.isAbsolute(env.firebaseServiceAccountPath)
-    ? env.firebaseServiceAccountPath
-    : path.resolve(__dirname, '../../', env.firebaseServiceAccountPath);
-
-  if (!fs.existsSync(serviceAccountPath)) {
-    throw new Error(`Firebase service account file not found at ${serviceAccountPath}.`);
-  }
-
-  return JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+  throw new Error('Set FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 in the backend environment.');
 };
 
 const serviceAccount = resolveServiceAccount();

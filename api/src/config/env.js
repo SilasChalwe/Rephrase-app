@@ -40,7 +40,7 @@ module.exports = {
     ? allowedOrigins
     : ['http://localhost:3000', 'http://localhost:8081', 'http://localhost:19006'],
   firebaseDatabaseUrl: process.env.FIREBASE_DATABASE_URL || '',
-  firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
+  firebaseServiceAccountJsonBase64: process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || '',
   storageProvider: normalizeStorageProvider(process.env.STORAGE_PROVIDER),
   storageAccess: normalizeStorageAccess(process.env.STORAGE_ACCESS),
   readWriteToken: process.env._READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '',

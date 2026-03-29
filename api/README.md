@@ -28,7 +28,7 @@ cp .env.example .env
 
 3. For Firebase Admin auth:
 
-- point `FIREBASE_SERVICE_ACCOUNT_PATH` at a local service-account JSON file
+- set `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` to the base64-encoded full service-account JSON
 
 4. Start the API:
 
@@ -40,17 +40,18 @@ The local server listens on `http://localhost:8080` by default.
 
 ## Vercel deployment
 
-Deploy the `api` folder as its own Vercel project root. The serverless entrypoint is [src/index.js](/home/silas/repo/Rephrase-app/api/src/index.js), which exports the Express app for Vercel Functions.
+Deploy the `api` folder as its own Vercel project root. The serverless entrypoint is [index.js](/home/silas/repo/Rephrase-app/api/index.js), which exports the Express app for Vercel Functions.
 
 Set these Vercel environment variables:
 
-- `FIREBASE_SERVICE_ACCOUNT_PATH`
+- `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`
 - `FIREBASE_DATABASE_URL` if your project uses Realtime Database
 - `STORAGE_PROVIDER=vercel-blob`
 - `STORAGE_ACCESS=public`
 - `BLOB_READ_WRITE_TOKEN` or `_READ_WRITE_TOKEN`
 
 Vercel usually gives you `BLOB_READ_WRITE_TOKEN` automatically. The backend also accepts `_READ_WRITE_TOKEN` if you prefer the shorter alias.
+Base64 is only an encoding format for easier env pasting, not encryption.
 
 ## Upload notes
 
