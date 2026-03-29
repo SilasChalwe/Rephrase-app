@@ -1,5 +1,6 @@
 const { admin, database } = require('../config/firebase');
 const { generateChatKey, normalizeChatMessage } = require('../utils/chat');
+const friendsService = require('./friendsService');
 
 const CHAT_ROOT = 'chats';
 const PRESENCE_ROOT = 'presence';
@@ -59,6 +60,54 @@ const loadChatHistoryByUsers = async (userId, otherUserId, limit = 100) => {
     .once('value');
 
   return mapSnapshotToMessages(snapshot);
+};
+
+const buildConversationSummary = async (currentUserId, friend) => {
+  const chatKey = generateChatKey(currentUserId, friend.document_Id);
+  const snapshot = await getMessagesRef(chatKey)
+    .orderByChild('timestamp')
+    .limitToLast(50)
+    .once('value');
+
+  const messages = mapSnapshotToMessages(snapshot);
+  const lastMessage = messages[messages.length - 1] || null;
+  const unreadCount = messages.filter(
+    (message) => message.receiverId === currentUserId && message.status !== 'READ'
+  ).length;
+
+  return {
+    ...friend,
+    chatKey,
+    unreadCount,
+    lastMessageText:
+      lastMessage?.type === 'TEXT'
+        ? lastMessage.message
+        : lastMessage?.mediaUrl
+          ? 'Sent a media message'
+          : '',
+    lastMessageType: lastMessage?.type || null,
+    lastMessageStatus: lastMessage?.status || null,
+    lastMessageSenderId: lastMessage?.senderId || null,
+    lastMessageTimestamp: lastMessage?.timestamp || null,
+  };
+};
+
+const getConversationSummaries = async (currentUserId) => {
+  const friends = await friendsService.getFriends(currentUserId);
+  const summaries = await Promise.all(
+    friends.map((friend) => buildConversationSummary(currentUserId, friend))
+  );
+
+  return summaries.sort((left, right) => {
+    const leftTimestamp = Number(left.lastMessageTimestamp || 0);
+    const rightTimestamp = Number(right.lastMessageTimestamp || 0);
+
+    if (leftTimestamp !== rightTimestamp) {
+      return rightTimestamp - leftTimestamp;
+    }
+
+    return String(left.fullName || '').localeCompare(String(right.fullName || ''));
+  });
 };
 
 const updateMessageStatus = async (messageId, senderId, receiverId, status) => {
@@ -125,6 +174,7 @@ const listenForMessages = (userId, otherUserId, onMessage, onError) => {
 };
 
 module.exports = {
+  getConversationSummaries,
   isUserOnline,
   listenForMessages,
   loadChatHistoryByUsers,

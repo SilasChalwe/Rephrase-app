@@ -37,6 +37,15 @@ const getChatHistory = async (req, res) => {
   }
 };
 
+const getConversationSummaries = async (req, res) => {
+  try {
+    const summaries = await chatService.getConversationSummaries(req.user.uid);
+    return res.json(summaries);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to load conversation summaries.' });
+  }
+};
+
 const updateMessageStatus = async (req, res) => {
   try {
     await chatService.updateMessageStatus(
@@ -121,6 +130,7 @@ const messageStream = (req, res) => {
 
 module.exports = {
   checkOnlineStatus,
+  getConversationSummaries,
   getChatHistory,
   markConversationAsRead,
   messageStream,

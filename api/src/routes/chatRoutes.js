@@ -2,6 +2,7 @@ const express = require('express');
 
 const {
   checkOnlineStatus,
+  getConversationSummaries,
   getChatHistory,
   markConversationAsRead,
   messageStream,
@@ -15,6 +16,7 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 router.use(requireAuth);
+router.get('/conversations', getConversationSummaries);
 router.post('/messages/text', sendTextMessage);
 router.post('/messages/media', sendMediaMessage);
 router.get('/messages/stream', messageStream);

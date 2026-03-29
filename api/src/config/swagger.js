@@ -148,6 +148,31 @@ const createOpenApiSpec = (baseUrl = '') => ({
           timestamp: { type: 'number' },
         },
       },
+      ChatConversationSummary: {
+        type: 'object',
+        properties: {
+          document_Id: { type: 'string' },
+          fullName: { type: 'string' },
+          emailAddress: { type: 'string' },
+          phoneNumber: { type: 'string' },
+          profilePictureUrl: { type: 'string' },
+          chatKey: { type: 'string' },
+          unreadCount: { type: 'number' },
+          lastMessageText: { type: 'string' },
+          lastMessageType: {
+            oneOf: [{ type: 'string' }, { type: 'null' }],
+          },
+          lastMessageStatus: {
+            oneOf: [{ type: 'string' }, { type: 'null' }],
+          },
+          lastMessageSenderId: {
+            oneOf: [{ type: 'string' }, { type: 'null' }],
+          },
+          lastMessageTimestamp: {
+            oneOf: [{ type: 'number' }, { type: 'null' }],
+          },
+        },
+      },
       UploadProfileImageResponse: {
         type: 'object',
         properties: {
@@ -549,6 +574,26 @@ const createOpenApiSpec = (baseUrl = '') => ({
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ChatMessage' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/chat/conversations': {
+      get: {
+        tags: ['Chat'],
+        summary: 'Load conversation summaries for the current user',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Conversation summaries',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/ChatConversationSummary' },
+                },
               },
             },
           },
