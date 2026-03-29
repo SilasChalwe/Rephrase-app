@@ -33,5 +33,6 @@ target/
 *.log
 # secrets
 *.json
+!api/vercel.json
 application.properties
 .env
