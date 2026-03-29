@@ -1,0 +1,22 @@
+import Constants from 'expo-constants';
+
+const extra = Constants.expoConfig?.extra ?? {};
+const firebase = extra.firebase ?? {};
+
+const sanitizeBaseUrl = (value) => String(value || 'http://localhost:8080').replace(/\/+$/, '');
+
+export const APP_CONFIG = {
+  apiBaseUrl: sanitizeBaseUrl(extra.apiBaseUrl),
+  firebase: {
+    apiKey: firebase.apiKey ?? '',
+    authDomain: firebase.authDomain ?? '',
+    databaseURL: firebase.databaseURL ?? '',
+    projectId: firebase.projectId ?? '',
+    storageBucket: firebase.storageBucket ?? '',
+    messagingSenderId: firebase.messagingSenderId ?? '',
+    appId: firebase.appId ?? '',
+    measurementId: firebase.measurementId ?? '',
+  },
+};
+
+export const API_BASE_URL = APP_CONFIG.apiBaseUrl;

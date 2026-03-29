@@ -1,0 +1,65 @@
+name: Android Production APK
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+
+jobs:
+  build-production-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: mobile-app
+
+    steps:
+      - name: Check for Expo token
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Missing EXPO_TOKEN secret."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Write mobile environment files
+        env:
+          MOBILE_APP_SETTING_ENV: ${{ secrets.MOBILE_APP_SETTING_ENV }}
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$MOBILE_APP_SETTING_ENV" ]; then
+            echo "Missing MOBILE_APP_SETTING_ENV secret."
+            exit 1
+          fi
+
+          if [ -z "$ANDROID_GOOGLE_SERVICES_JSON" ]; then
+            echo "Missing ANDROID_GOOGLE_SERVICES_JSON secret."
+            exit 1
+          fi
+
+          printf '%s' "$MOBILE_APP_SETTING_ENV" > setting.env
+          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON" > google-services.json
+
+      - name: Build production APK on EAS
+        run: eas build --platform android --profile production-apk --non-interactive --wait
