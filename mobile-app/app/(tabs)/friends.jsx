@@ -1,349 +1,465 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, FlatList, ScrollView } from 'react-native'
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react'
-import FriendRequest from '../components/friendRequest';
-import MyFriends from '../components/myFriends';
-import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { custom_colors } from '../utilities/colors';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import FriendRequest from '../../components/friendRequest';
+import MyFriends from '../../components/myFriends';
+import { custom_colors } from '../../utilities/colors';
 import { buildApiUrl, getAuthToken } from '../../lib/api';
 
-const FriendsSreen = () => {
-  const [showFriends, setShowFriens] = useState(true);
-  const [isRequests, setRequests] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+const profileColors = ['#FFCC00', '#33CC33', '#FF3399'];
+
+const chooseProfileColor = (seed = '') => {
+  const normalizedSeed = String(seed || '');
+  if (!normalizedSeed) {
+    return profileColors[0];
+  }
+
+  const sum = normalizedSeed.split('').reduce((total, value) => total + value.charCodeAt(0), 0);
+  return profileColors[sum % profileColors.length];
+};
+
+const buildHeaders = (token) => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${token}`,
+});
+
+const FriendsScreen = () => {
+  const [activeTab, setActiveTab] = useState('requests');
+  const [requests, setRequests] = useState([]);
   const [friends, setFriends] = useState([]);
-  const [currentUser, setCurrentUser] = useState([]);
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const handleButton = () => {
-    setShowFriens(false);
-    getRequests();
-    getFriends();
-  }
-  const profileColors = ['#FFCC00', '#33CC33', '#Ff3399'];
-
-
-  const assertColors = () => {
-    const index = Math.floor(Math.random() * profileColors.length);
-    return profileColors[index];
-  }
-  const renderBackdrop = useCallback((props) => (
-    <BottomSheetBackdrop
-      {...props}
-      disappearsOnIndex={-1}
-      appearsOnIndex={0}
-      pressBehavior="close"
-      opacity={0.7}
-    />
-  ), []);
-
-
-  useEffect(() => {
-    getRequests();
-    getFriends();
-  }, []);
-
-  //hundling request
-  const getRequests = async () => {
-
+  const loadPendingRequests = useCallback(async () => {
     try {
-      setIsLoading(true);
-
       const token = await getAuthToken();
+      if (!token) {
+        return;
+      }
+
       const response = await fetch(buildApiUrl('/api/friends/requests/pending'), {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: buildHeaders(token),
       });
 
-
-      if (response.ok) {
-        const data = await response.json();
-        setRequests(data);
-        //console.log("\n\nreturned data =>",data);
-
-      } else {
-        console.log("Server responded with error:", response);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Failed to load friend requests.');
       }
 
+      const data = await response.json();
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("fetch request failed:", error);
-    } finally {
-      setIsLoading(false);
+      console.error('Pending friend requests load failed:', error);
     }
-  };
+  }, []);
 
-  const reMoveUserFromRequestArray = (id) => {
-    if (!id) return false;
-    const newReQuest = isRequests.filter(user => user.document_Id !== id);
-    setRequests(newReQuest);
-    return true;
-  }
-  const confirmRequest = async (document_Id) => {
-    //console.log("the point has been hit==>",document_Id);
-    //if (!document_Id) { throw new Error("the target id is empty"); return; }
+  const loadFriends = useCallback(async () => {
     try {
-      setIsLoading(true);
-      console.log("\n\n ID", document_Id, "\n\n")
       const token = await getAuthToken();
-      const response = await fetch(buildApiUrl(`/api/friends/requests/${document_Id}`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-
-      });
-      if (response.ok) {
-        if (reMoveUserFromRequestArray(document_Id)) {
-          alert("approved");
-        } else {
-          console.log("somethig went wrong whilst deleting");
-        }
-
-      } else {
-        alert("bad response");
+      if (!token) {
+        return;
       }
 
-    } catch (err) {
-      console.error('Failed to approve request:', err);
-      alert('Failed to approve request.');
-
-    }
-    finally {
-
-      setIsLoading(false);
-    }
-  }
-  const getFriends = async () => {
-    try {
-      setIsLoading(true);
-      const token = await getAuthToken();
       const response = await fetch(buildApiUrl('/api/friends'), {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        }
-      })
-      if (response.ok) {
-        const data = await response.json();
-        //console.log("returned data =>>",data);
-        setFriends(data);
-      } else {
-        console.log("bad request");
+        headers: buildHeaders(token),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Failed to load friends.');
       }
 
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setIsLoading(false);
+      const data = await response.json();
+      setFriends(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Friends load failed:', error);
     }
-  }
-  const bottomSheetRef = useRef(null);
-  const snapPoints = useMemo(() => ['1%', '20%', '40%', '90%'], []);
+  }, []);
 
-  const openBottomSheet = (user) => {
-    console.log("User ==>", user);
-    setCurrentUser(user);
-    bottomSheetRef.current?.expand();
-  };
+  const loadFriendsContext = useCallback(async () => {
+    await Promise.all([loadPendingRequests(), loadFriends()]);
+  }, [loadFriends, loadPendingRequests]);
+
+  useEffect(() => {
+    loadFriendsContext();
+  }, [loadFriendsContext]);
+
+  const upsertFriend = useCallback((nextFriend) => {
+    if (!nextFriend?.document_Id) {
+      return;
+    }
+
+    setFriends((currentFriends) => {
+      const hasFriend = currentFriends.some(
+        (friend) => String(friend.document_Id) === String(nextFriend.document_Id)
+      );
+
+      if (hasFriend) {
+        return currentFriends.map((friend) =>
+          String(friend.document_Id) === String(nextFriend.document_Id) ? nextFriend : friend
+        );
+      }
+
+      return [...currentFriends, nextFriend].sort((left, right) =>
+        String(left.fullName || '').localeCompare(String(right.fullName || ''))
+      );
+    });
+  }, []);
+
+  const handleApproveRequest = useCallback(
+    async (requestUser) => {
+      if (!requestUser?.document_Id) {
+        return;
+      }
+
+      try {
+        const token = await getAuthToken();
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch(
+          buildApiUrl(`/api/friends/requests/${requestUser.document_Id}`),
+          {
+            method: 'PUT',
+            headers: buildHeaders(token),
+          }
+        );
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(payload?.message || 'Failed to approve friend request.');
+        }
+
+        setRequests((currentRequests) =>
+          currentRequests.filter(
+            (user) => String(user.document_Id) !== String(requestUser.document_Id)
+          )
+        );
+        upsertFriend(payload?.friend || requestUser);
+      } catch (error) {
+        console.error('Friend request approval failed:', error);
+        Alert.alert('Friend Request', String(error?.message || 'Failed to approve request.'));
+      }
+    },
+    [upsertFriend]
+  );
+
+  const handleDeclineRequest = useCallback(async (requestUser) => {
+    if (!requestUser?.document_Id) {
+      return;
+    }
+
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch(
+        buildApiUrl(`/api/friends/requests/${requestUser.document_Id}`),
+        {
+          method: 'DELETE',
+          headers: buildHeaders(token),
+        }
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Failed to remove friend request.');
+      }
+
+      setRequests((currentRequests) =>
+        currentRequests.filter(
+          (user) => String(user.document_Id) !== String(requestUser.document_Id)
+        )
+      );
+    } catch (error) {
+      console.error('Friend request decline failed:', error);
+      Alert.alert('Friend Request', String(error?.message || 'Failed to remove request.'));
+    }
+  }, []);
+
+  const openBottomSheet = useCallback((user) => {
+    setSelectedFriend(user);
+    setShowProfileModal(true);
+  }, []);
+
+  const requestListEmptyState = useMemo(
+    () => (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyTitle}>No pending requests</Text>
+        <Text style={styles.emptyText}>Incoming friend requests will appear here.</Text>
+      </View>
+    ),
+    []
+  );
+
+  const friendsListEmptyState = useMemo(
+    () => (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyTitle}>No friends yet</Text>
+        <Text style={styles.emptyText}>Search for people on the home tab and send a request.</Text>
+      </View>
+    ),
+    []
+  );
+
+  const renderRequestItem = useCallback(
+    ({ item }) => (
+      <FriendRequest
+        Color={chooseProfileColor(item.document_Id)}
+        confirmRequest={() => handleApproveRequest(item)}
+        cancelRequest={() => handleDeclineRequest(item)}
+        isRequest
+        name={item.fullName}
+        profile={item.profilePictureUrl}
+      />
+    ),
+    [handleApproveRequest, handleDeclineRequest]
+  );
+
+  const renderFriendItem = useCallback(
+    ({ item }) => (
+      <MyFriends
+        Color={chooseProfileColor(item.document_Id)}
+        name={item.fullName}
+        pressed={() => openBottomSheet(item)}
+        profilePic={item.profilePictureUrl}
+      />
+    ),
+    [openBottomSheet]
+  );
 
   return (
-    <SafeAreaView style={{flex:1}}>
-      <View style={styles.buttonContainer}>
-        <Text style={{
-          fontFamily: 'Colonna',
-          fontSize: 60,
-          position: 'absolute',
-          top: 30,
-          alignSelf: 'center',
-          color: 'white',
-        }}>Friends</Text>
-        {/* buttons to decide what to display */}
-        <TouchableOpacity onPress={() => setShowFriens(true)} style={styles.btn1}>
-          <Text style={{ color: 'white' }}>find friends</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Friends</Text>
 
-        <TouchableOpacity onPress={() => handleButton()} style={styles.btn2}>
-          <Text>Your Friends</Text></TouchableOpacity>
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('requests')}
+            style={[styles.tabButton, activeTab === 'requests' ? styles.tabButtonActive : null]}
+          >
+            <Text
+              style={[styles.tabButtonText, activeTab === 'requests' ? styles.tabButtonTextActive : null]}
+            >
+              Requests
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setActiveTab('friends')}
+            style={[styles.tabButton, activeTab === 'friends' ? styles.tabButtonActive : null]}
+          >
+            <Text
+              style={[styles.tabButtonText, activeTab === 'friends' ? styles.tabButtonTextActive : null]}
+            >
+              Your Friends
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      {/* conditonal rendering based on the button */}
-      {showFriends &&
-        (
-          <View style={styles.findFriend}>
-            {isRequests.map((user) => (
 
-              <View key={user.document_Id}>
+      <View style={styles.content}>
+        {activeTab === 'requests' ? (
+          <FlatList
+            contentContainerStyle={styles.listContent}
+            data={requests}
+            keyExtractor={(item) => String(item.document_Id)}
+            ListEmptyComponent={requestListEmptyState}
+            renderItem={renderRequestItem}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.listContent}
+            data={friends}
+            keyExtractor={(item) => String(item.document_Id)}
+            ListEmptyComponent={friendsListEmptyState}
+            renderItem={renderFriendItem}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
 
-                <FriendRequest
-                  name={user.fullName}
-                  confirmRequest={() => { confirmRequest(user.document_Id) }}
-                  isRequest={true}
-                  Color={assertColors()}
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setShowProfileModal(false)}
+        transparent
+        visible={showProfileModal}
+      >
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setShowProfileModal(false)} />
+          <View style={styles.bottomSheet}>
+            <ScrollView style={styles.bottomOuter}>
+              <View style={styles.userProfile}>
+                <Image
+                  source={require('../assets/images/profile-bg.png')}
+                  style={styles.profileCover}
+                />
+                <Image
+                  source={
+                    selectedFriend?.profilePictureUrl
+                      ? { uri: selectedFriend.profilePictureUrl }
+                      : require('../assets/icons/profile.png')
+                  }
+                  style={selectedFriend?.profilePictureUrl ? styles.profileImage : styles.profileFallback}
                 />
               </View>
-            ))
-          
-            }
-           {!isRequests.length &&(
-            <View style={{width:'100%',
-            height:100,
-          
-            display:'flex',
-            justifyContent:'center',
-            alignItems:'center',
-            }}>
-              <Text style={{color:'grey',fontSize:18,fontStyle:'italic'}}>you don`t have friends request</Text>
-            </View>
-           )
 
-           }
-
-
+              <Text style={styles.profileLine}>
+                Name: <Text style={styles.profileValue}>{selectedFriend?.fullName ?? ''}</Text>
+              </Text>
+              <Text style={styles.profileLine}>
+                Email: <Text style={styles.profileValue}>{selectedFriend?.emailAddress ?? ''}</Text>
+              </Text>
+              <Text style={styles.profileLine}>
+                Phone: <Text style={styles.profileValue}>{selectedFriend?.phoneNumber ?? ''}</Text>
+              </Text>
+            </ScrollView>
           </View>
-        )
-        
-        
-        }
-
-      {!showFriends && (
-        <View style={{ flex: 1,}}>
-          <FlatList
-            data={friends}
-            scrollEnabled={true}
-            keyExtractor={(item) => item.document_Id.toString()}
-            renderItem={({ item }) => (
-              <MyFriends
-                pressed={() => openBottomSheet(item)}
-                name={item.fullName}
-                profilePic={item.profilePictureUrl}
-                Color={assertColors()}
-              />
-            )}
-            contentContainerStyle={{ paddingBottom: 100 }} // if you have a FAB or bottom tab
-          />
         </View>
-
-
-      )
-      }
-      <BottomSheet
-        index={-1}
-        ref={bottomSheetRef}
-        snapPoints={snapPoints}
-        style={styles.bottomSheet}
-        backdropComponent={renderBackdrop}
-      >
-        <BottomSheetView style={styles.bottomOuter}>
-          <ScrollView>
-            <View style={styles.userProfile}>
-              <Image 
-              source={require('../assets/images/profile-bg.png')}
-              style={{
-                width:'100%',
-                height:200,
-                position:'absolute',
-                zIndex:-1,
-                borderRadius:15,
-              }}
-              />
-              <Image
-                style={currentUser.profilePictureUrl ?{ width: 170, height: 170,borderRadius:15 }:{
-                  width:90,height:90
-                }}
-                source={currentUser.profilePictureUrl ? { uri: currentUser.profilePictureUrl } : require('../assets/icons/profile.png')}
-              />
-            </View>
-            <Text style={{ fontSize: 18, color: 'grey', marginLeft: 40, marginTop: 10 }} >Name  :<Text style={{ color: 'blue' }}> {currentUser.fullName}</Text></Text>
-            <Text style={{ fontSize: 18, color: 'grey', marginLeft: 40, marginTop: 10 }} >Email : <Text style={{ color: 'blue' }}>{currentUser.emailAddress}</Text></Text>
-            <Text style={{ fontSize: 18, color: 'grey', marginLeft: 40, marginTop: 10 }} >Phone : <Text style={{ color: 'blue' }}>{currentUser.phoneNumber}</Text></Text>
-
-
-          </ScrollView>
-        </BottomSheetView>
-      </BottomSheet>
-       {isLoading &&
-              <View style={{
-                width: '100%',
-                height: '100%',
-                position: 'absolute',
-                backgroundColor: 'white',
-
-              }}>
-                <Image
-                  source={require('../assets/icons/loading-bg.png')}
-                  style={{ width: '100%', height: '100%' }}
-                />
-                <ActivityIndicator
-                  size="large"
-                  color="#8686DB"
-                  style={{
-                    marginTop: 20,
-                    transform: [{ scale: 2 }],
-                    width: '100%',
-                    height: '100%',
-                    position: 'absolute',
-                  }} />
-
-              </View>}
+      </Modal>
     </SafeAreaView>
-  )
-}
+  );
+};
 
-export default FriendsSreen;
+export default FriendsScreen;
 
 const styles = StyleSheet.create({
-  btn1: {
-    fontSize: '24pt',
-    backgroundColor: 'blue',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    color: '#fff',
+  screen: {
+    flex: 1,
+    backgroundColor: custom_colors.secondary,
   },
-  btn2: {
-    fontSize: '24pt',
-    backgroundColor: '#FFCC00',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    color: '#0000'
-
-  },
-  buttonContainer: {
-    display: 'flex',
-    flexDirection: 'row',
-    width: '100%',
-    height: 200,
-    paddingTop: 80,
-    justifyContent: 'center',
+  header: {
     alignItems: 'center',
-    gap: 1,
     backgroundColor: custom_colors.primary_dark,
-    borderBottomLeftRadius: 50,
+    borderBottomLeftRadius: 40,
+    minHeight: 200,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
-  findFriend: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#E6E6E6',
-    gap: 3,
+  headerTitle: {
+    alignSelf: 'center',
+    color: '#FFFFFF',
+    fontFamily: 'Colonna',
+    fontSize: 52,
+    marginTop: 12,
   },
-  myFriends: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#E6E6E6',
-    gap: 3,
-
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 24,
+  },
+  tabButton: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFD6AE',
+  },
+  tabButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  tabButtonTextActive: {
+    color: custom_colors.primary_dark,
+  },
+  content: {
+    flex: 1,
+    marginTop: -10,
+    paddingTop: 16,
+  },
+  listContent: {
+    paddingBottom: 24,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 56,
+  },
+  emptyTitle: {
+    color: '#49566F',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: '#7B889E',
+    fontSize: 14,
+    textAlign: 'center',
   },
   userProfile: {
-    width: '90%',
-    height: 200,
-    
     alignItems: 'center',
-    justifyContent: 'center',
     alignSelf: 'center',
     borderRadius: 20,
-
+    height: 200,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: '90%',
   },
-
+  profileCover: {
+    borderRadius: 15,
+    height: 200,
+    position: 'absolute',
+    width: '100%',
+    zIndex: -1,
+  },
+  profileImage: {
+    borderRadius: 16,
+    height: 170,
+    width: 170,
+  },
+  profileFallback: {
+    height: 90,
+    tintColor: '#FFFFFF',
+    width: 90,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(6, 22, 46, 0.24)',
+  },
+  bottomSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    paddingVertical: 20,
+  },
+  bottomOuter: {
+    paddingBottom: 30,
+  },
+  profileLine: {
+    color: '#6B778D',
+    fontSize: 18,
+    marginLeft: 40,
+    marginTop: 12,
+  },
+  profileValue: {
+    color: '#1F5FA6',
+  },
 });

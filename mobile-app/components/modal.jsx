@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, View, Text, Image, StyleSheet, Dimensions, TouchableOpacity,ActivityIndicator } from 'react-native';
+import { Alert, View, Text, Image, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Modal from 'react-native-modal';
 import * as ImagePicker from 'expo-image-picker';
 import { signOut } from 'firebase/auth';
-import { FIREBASE_AUTH } from '../../firebase';
+import { FIREBASE_AUTH } from '../firebase';
 import { router } from 'expo-router';
-import { buildApiUrl, clearStoredUser, getStoredUser, persistStoredUser } from '../../lib/api';
+import { buildApiUrl, clearStoredUser, getStoredUser, persistStoredUser } from '../lib/api';
 
 const { height } = Dimensions.get('window');
 
@@ -73,7 +73,7 @@ export default function Mymodal({ visible, onClose }) {
 const handleLaunce = async () => {
    setIsChangeProfle(false);
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ['images'],
     allowsEditing: true,
     aspect: [1, 1],
     quality: 1,
@@ -112,11 +112,10 @@ const handleLaunce = async () => {
   const handleUseCamera = async () => {
  setIsChangeProfle(false);
     const status = await requestCameraPermission();
-    console.log("Permission status:", status);
 
     if (status) {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
@@ -128,8 +127,6 @@ const handleLaunce = async () => {
       if (!result.canceled) {
         const imageUri = result.assets[0].uri;
         await uploadProfileImage(imageUri);
-      } else {
-        console.log("User canceled camera.");
       }
     }
   };
@@ -153,7 +150,7 @@ const handleLaunce = async () => {
         {/*the backgrond layer for profile cover which is startic  */}
         <View style={styles.img_container}>
           <Image
-            source={require('../assets/images/profile-bg.png')}
+            source={require('../app/assets/images/profile-bg.png')}
             style={styles.bg_image}
           />
         </View>
@@ -162,20 +159,20 @@ const handleLaunce = async () => {
         <View style={styles.top_cover}></View>
         <TouchableOpacity onPress={() => { handleSetProfile() }} style={styles.edit_profileImage}>
           <Image
-            source={require('../assets/icons/edit-camera.png')}
+            source={require('../app/assets/icons/edit-camera.png')}
             style={{ width: 30, height: 30, resizeMode: 'contain' }}
           />
         </TouchableOpacity>
 
         <View style={styles.profile}>
           <Image
-            source={ userData?.photoURL ? { uri: userData.photoURL } : require('../assets/icons/profile.png')}
+            source={ userData?.photoURL ? { uri: userData.photoURL } : require('../app/assets/icons/profile.png')}
             style={{ width: 110, height: 110, resizeMode: 'contentFit' }}
           />
         </View>
         <TouchableOpacity style={styles.btn} onPress={onClose} >
           <Image
-            source={require('../assets/icons/close.png')}
+            source={require('../app/assets/icons/close.png')}
             style={{
               resizeMode: 'center',
               width: 25,
@@ -203,7 +200,7 @@ const handleLaunce = async () => {
           <View style={styles.changingProfile}>
             <TouchableOpacity onPress={handleUseCamera} style={styles.selectionBtn}>
               <Image
-                source={require('../assets/icons/take-photo.png')}
+                source={require('../app/assets/icons/take-photo.png')}
                 style={{
                   resizeMode: 'contain',
                   width: 60,
@@ -220,7 +217,7 @@ const handleLaunce = async () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleLaunce()} style={styles.selectionBtn}>
               <Image
-                source={require('../assets/icons/gallery.png')}
+                source={require('../app/assets/icons/gallery.png')}
                 style={{
                   resizeMode: 'contain',
                   width: 60,
@@ -239,7 +236,7 @@ const handleLaunce = async () => {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleSetProfile(false)} style={styles.selectionBtn}>
               <Image
-                source={require('../assets/icons/cancel.png')}
+                source={require('../app/assets/icons/cancel.png')}
                 style={{
                   resizeMode: 'contain',
                   width: 60,
@@ -255,15 +252,11 @@ const handleLaunce = async () => {
 
               }}>Cancel</Text>
             </TouchableOpacity>
-        {loading && (
-        <ActivityIndicator size="large" color="#8686DB" style={{ marginTop: 20 }} />
-          
-        )}
           </View>
         )}
         <TouchableOpacity onPress={() => {logout()}} style={styles.logout}>
           <Image
-            source={require('../assets/icons/logout.png')}
+            source={require('../app/assets/icons/logout.png')}
             style={{ width: 35, height: 45, resizeMode: 'contain', tintColor: 'red' }}
           />
           <Text style={{ color: 'red', fontSize: 20, marginTop: 10 }}>Logout</Text>

@@ -18,7 +18,7 @@ const FriendRequest = ({
       <View style={styles.profileSection}>
         <View style={[styles.avatarWrapper, { backgroundColor: Color }]}>
           <Image
-            source={profile ? { uri: profile } : require('../assets/icons/profile.png')}
+            source={profile ? { uri: profile } : require('../app/assets/icons/profile.png')}
             style={styles.avatar}
           />
         </View>

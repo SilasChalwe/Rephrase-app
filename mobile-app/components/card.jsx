@@ -15,7 +15,7 @@ const Card = ({ name,onpress, profilePicture, date ,color}) => {
       <View style={styles.card}>
         <View style={[styles.header,{backgroundColor:color}]}>
           <Image
-            source={profilePicture?{uri:profilePicture}:require('../assets/icons/profile.png')}
+            source={profilePicture?{uri:profilePicture}:require('../app/assets/icons/profile.png')}
             style={[profilePicture?{width:80,height:80}:styles.images]}
           />
          

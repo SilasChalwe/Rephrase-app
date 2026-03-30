@@ -14,6 +14,11 @@ export const APP_CONFIG = {
     messagingSenderId: firebase.messagingSenderId ?? '',
     appId: firebase.appId ?? '',
   },
+  googleAuth: {
+    androidClientId: extra.googleAuth?.androidClientId ?? '',
+    iosClientId: extra.googleAuth?.iosClientId ?? '',
+    webClientId: extra.googleAuth?.webClientId ?? '',
+  },
 };
 
 export const API_BASE_URL = APP_CONFIG.apiBaseUrl;

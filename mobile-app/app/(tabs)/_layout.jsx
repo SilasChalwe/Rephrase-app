@@ -1,7 +1,6 @@
 import { View, Image } from 'react-native';
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 
 const TabsIcon = ({ icon, color, focused,extraStyles }) => (
@@ -19,7 +18,6 @@ const TabsIcon = ({ icon, color, focused,extraStyles }) => (
 );
 const TabsLayout = () => {
   return (
-    <GestureHandlerRootView>
       <Tabs>
         <Tabs.Screen
           name="home"
@@ -72,7 +70,6 @@ const TabsLayout = () => {
           }}
 />
       </Tabs>
-    </GestureHandlerRootView>
   );
 };
 

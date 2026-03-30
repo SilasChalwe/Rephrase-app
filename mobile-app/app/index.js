@@ -4,16 +4,15 @@ import {
   View,
   Text,
   Image,
-  StyleSheet,
-  SafeAreaView,
-  ActivityIndicator
+  StyleSheet
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import jwtDecode from 'jwt-decode';
 import jwt_decode from "jwt-decode";
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import CustomButton from './components/CustomButton';
+import CustomButton from '../components/CustomButton';
 
 const isTokenValid = (token) => {
   try {
@@ -58,11 +57,7 @@ export default function Page() {
   }, []);
 
   if (checkingToken) {
-    return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={{ flex: 1, backgroundColor: '#081A33' }} />;
   }
 
   return (

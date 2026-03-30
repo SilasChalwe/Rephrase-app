@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "scheme": "rephrase",
+    "name": "rephrase",
+    "slug": "rephrase",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your friends.",
+          "cameraPermission": "The app uses your camera to let you take profile pictures."
+        }
+      ]
+    ],
+    
+    "extra": {
+      "eas": {
+        "projectId": "ed28b5ed-7bd7-4582-90e6-05a90275ae2e"
+      }
+    },
+    "owner": "eric-coder",
+    "android": {
+      "googleServicesFile": "./google-services.json",
+      "package": "com.covianhive.rephrase",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/ed28b5ed-7bd7-4582-90e6-05a90275ae2e"
+    },
+    "ios": {},
+    "splash": {
+      "image": "./logo_secondary.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    }
+  }
+}

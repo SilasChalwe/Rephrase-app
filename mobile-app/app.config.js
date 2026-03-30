@@ -54,6 +54,11 @@ module.exports = {
         messagingSenderId: env.FIREBASE_PROJECT_NUMBER || '',
         appId: env.FIREBASE_APP_ID || '',
       },
+      googleAuth: {
+        androidClientId: env.GOOGLE_ANDROID_CLIENT_ID || '',
+        iosClientId: env.GOOGLE_IOS_CLIENT_ID || '',
+        webClientId: env.GOOGLE_WEB_CLIENT_ID || '',
+      },
     },
   },
 };

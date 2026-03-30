@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "867181273641",
+    "project_id": "rephrase-app26",
+    "storage_bucket": "rephrase-app26.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867181273641:android:e220e17984a28bd583b238",
+        "android_client_info": {
+          "package_name": "com.covianhive.rephrase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCKYy1bZvIZkAbBw0NwcvdZ3kCKTlfwWA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
