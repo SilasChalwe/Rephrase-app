@@ -93,12 +93,22 @@ const sendTextMessage = async (senderId, receiverId, text, clientMessageId = '')
     clientMessageId,
   });
 
-const sendMediaMessage = async (senderId, receiverId, mediaUrl, mediaType) =>
+const sendMediaMessage = async (
+  senderId,
+  receiverId,
+  mediaUrl,
+  mediaType,
+  { mimeType = '', fileName = '', fileSize = null, thumbnailUrl = null } = {}
+) =>
   sendMessage({
     senderId,
     receiverId,
     mediaUrl,
     type: mediaType,
+    mimeType,
+    fileName,
+    fileSize,
+    thumbnailUrl,
   });
 
 const dedupeMessages = (messages) => {

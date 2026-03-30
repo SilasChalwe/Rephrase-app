@@ -1,4 +1,19 @@
 const chatService = require('../services/chatService');
+const storageService = require('../services/storageService');
+
+const deriveUploadedMediaType = (mimeType = '') => {
+  const normalizedMimeType = String(mimeType || '').toLowerCase();
+
+  if (normalizedMimeType.startsWith('image/')) {
+    return 'IMAGE';
+  }
+
+  if (normalizedMimeType.startsWith('video/')) {
+    return 'VIDEO';
+  }
+
+  return 'DOCUMENT';
+};
 
 const sendTextMessage = async (req, res) => {
   try {
@@ -20,12 +35,38 @@ const sendMediaMessage = async (req, res) => {
       req.user.uid,
       req.body.receiverId,
       req.body.mediaUrl,
-      req.body.mediaType
+      req.body.mediaType,
+      {
+        mimeType: req.body.mimeType,
+        fileName: req.body.fileName,
+        fileSize: req.body.fileSize,
+        thumbnailUrl: req.body.thumbnailUrl,
+      }
     );
 
     return res.status(200).json(message);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to send media message.' });
+  }
+};
+
+const uploadChatAttachment = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'A file upload is required.' });
+  }
+
+  try {
+    const upload = await storageService.uploadChatAttachment({
+      userId: req.user.uid,
+      file: req.file,
+    });
+
+    return res.status(200).json({
+      ...upload,
+      mediaType: deriveUploadedMediaType(upload.mimeType),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `Chat attachment upload failed: ${error.message}` });
   }
 };
 
@@ -165,6 +206,7 @@ module.exports = {
   getChatHistory,
   markConversationAsRead,
   messageStream,
+  uploadChatAttachment,
   saveConversationReadAnchor,
   sendMediaMessage,
   sendTextMessage,

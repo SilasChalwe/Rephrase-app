@@ -12,7 +12,11 @@ const normalizeChatMessage = (documentId = '', rawMessage = {}) => ({
   receiverId: rawMessage.receiverId || '',
   message: rawMessage.message || '',
   status: rawMessage.status || 'SENT',
-  mediaUrl: rawMessage.mediaUrl ?? rawMessage.MediaUrl ?? null,
+  mediaUrl: rawMessage.mediaUrl ?? rawMessage.MediaUrl ?? rawMessage.fileUrl ?? rawMessage.url ?? null,
+  thumbnailUrl: rawMessage.thumbnailUrl ?? null,
+  mimeType: rawMessage.mimeType || rawMessage.contentType || '',
+  fileName: rawMessage.fileName || rawMessage.name || '',
+  fileSize: Number(rawMessage.fileSize || rawMessage.size || 0) || null,
   type: rawMessage.type ?? rawMessage.Type ?? 'TEXT',
   timestamp: Number(rawMessage.timestamp || Date.now()),
 });
