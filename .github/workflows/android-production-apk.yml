@@ -1,31 +1,29 @@
-name: Android Production APK
+name: Mobile Tag Release
 
 on:
   push:
     tags:
-      - "*"
-  workflow_dispatch:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  build-production-apk:
-    name: Build Android APK
+  build-android:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        abi:
+          - armeabi-v7a
+          - arm64-v8a
 
     defaults:
       run:
         working-directory: mobile-app
 
     steps:
-      - name: Check for Expo token
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "Missing EXPO_TOKEN secret."
-            exit 1
-          fi
-
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -33,33 +31,123 @@ jobs:
         with:
           node-version: 20
 
-      - name: Set up Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install mobile dependencies
+      - name: Install JS dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Write mobile environment files
-        env:
-          MOBILE_APP_SETTING_ENV: ${{ secrets.MOBILE_APP_SETTING_ENV }}
-          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Detect RAM and set safe Gradle memory
+        shell: bash
         run: |
-          if [ -z "$MOBILE_APP_SETTING_ENV" ]; then
-            echo "Missing MOBILE_APP_SETTING_ENV secret."
-            exit 1
+          TOTAL_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+          TOTAL_GB=$(awk -v kb="$TOTAL_KB" 'BEGIN {printf "%.2f", kb/1024/1024}')
+          CPU_CORES=$(nproc)
+
+          if [ "$TOTAL_KB" -lt 3145728 ]; then
+            XMX="1024m"
+            METASPACE="384m"
+            KOTLIN_XMX="768m"
+            WORKERS="1"
+            PARALLEL_FLAG="--no-parallel"
+          elif [ "$TOTAL_KB" -lt 6291456 ]; then
+            XMX="1792m"
+            METASPACE="512m"
+            KOTLIN_XMX="1024m"
+            if [ "$CPU_CORES" -le 1 ]; then
+              WORKERS="1"
+            else
+              WORKERS="2"
+            fi
+            PARALLEL_FLAG="--no-parallel"
+          elif [ "$TOTAL_KB" -lt 10485760 ]; then
+            XMX="3072m"
+            METASPACE="768m"
+            KOTLIN_XMX="2048m"
+            if [ "$CPU_CORES" -le 1 ]; then
+              WORKERS="1"
+              PARALLEL_FLAG="--no-parallel"
+            elif [ "$CPU_CORES" -le 2 ]; then
+              WORKERS="2"
+              PARALLEL_FLAG="--no-parallel"
+            else
+              WORKERS="3"
+              PARALLEL_FLAG="--parallel"
+            fi
+          else
+            XMX="4096m"
+            METASPACE="1024m"
+            KOTLIN_XMX="2048m"
+            if [ "$CPU_CORES" -le 2 ]; then
+              WORKERS="2"
+              PARALLEL_FLAG="--no-parallel"
+            elif [ "$CPU_CORES" -le 4 ]; then
+              WORKERS="$CPU_CORES"
+              PARALLEL_FLAG="--parallel"
+            else
+              WORKERS="4"
+              PARALLEL_FLAG="--parallel"
+            fi
           fi
 
-          if [ -z "$ANDROID_GOOGLE_SERVICES_JSON" ]; then
-            echo "Missing ANDROID_GOOGLE_SERVICES_JSON secret."
-            exit 1
-          fi
+          echo "Machine RAM: ${TOTAL_GB} GB"
+          free -h
+          echo "CPU cores: ${CPU_CORES}"
+          echo "Selected Gradle Xmx: ${XMX}"
+          echo "Selected MaxMetaspaceSize: ${METASPACE}"
+          echo "Selected Kotlin daemon Xmx: ${KOTLIN_XMX}"
+          echo "Selected Gradle workers: ${WORKERS}"
+          echo "Parallel mode flag: ${PARALLEL_FLAG}"
+          echo "GRADLE_XMX=${XMX}" >> "$GITHUB_ENV"
+          echo "GRADLE_METASPACE=${METASPACE}" >> "$GITHUB_ENV"
+          echo "GRADLE_KOTLIN_XMX=${KOTLIN_XMX}" >> "$GITHUB_ENV"
+          echo "GRADLE_WORKERS=${WORKERS}" >> "$GITHUB_ENV"
+          echo "GRADLE_PARALLEL_FLAG=${PARALLEL_FLAG}" >> "$GITHUB_ENV"
 
-          printf '%s' "$MOBILE_APP_SETTING_ENV" > setting.env
-          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON" > google-services.json
+      - name: Build release APK for ${{ matrix.abi }}
+        working-directory: mobile-app/android
+        env:
+          GRADLE_OPTS: "-Xmx${{ env.GRADLE_XMX }} -XX:MaxMetaspaceSize=${{ env.GRADLE_METASPACE }} -Dkotlin.daemon.jvm.options=-Xmx${{ env.GRADLE_KOTLIN_XMX }}"
+        run: |
+          chmod +x ./gradlew
+          ./gradlew ${{ env.GRADLE_PARALLEL_FLAG }} --max-workers=${{ env.GRADLE_WORKERS }} -PreactNativeArchitectures=${{ matrix.abi }} -PreleaseAbi=${{ matrix.abi }} assembleRelease
 
-      - name: Build production APK on EAS
-        run: eas build --platform android --profile production-apk --non-interactive --wait
+      - name: Prepare APK artifact for ${{ matrix.abi }}
+        run: |
+          mkdir -p release-assets
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/rephrase-${GITHUB_REF_NAME}-${{ matrix.abi }}.apk
+
+      - name: Upload Android artifact for ${{ matrix.abi }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ matrix.abi }}
+          path: mobile-app/release-assets/rephrase-${{ github.ref_name }}-${{ matrix.abi }}.apk
+
+  publish-release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-android
+
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub Release and upload mobile artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-assets/*.apk
