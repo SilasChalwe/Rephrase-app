@@ -5,12 +5,15 @@ const friendsService = require('./friendsService');
 const CHAT_ROOT = 'chats';
 const PRESENCE_ROOT = 'presence';
 const TYPING_ROOT = 'typing';
+const READ_ANCHOR_ROOT = 'readAnchors';
 
 const getMessagesRef = (chatKey) => database.ref(`${CHAT_ROOT}/${chatKey}/messages`);
 
 const getPresenceRef = (userId) => database.ref(`${PRESENCE_ROOT}/${userId}`);
 
 const getTypingRef = (chatKey, userId) => database.ref(`${TYPING_ROOT}/${chatKey}/${userId}`);
+const getReadAnchorRef = (chatKey, userId) =>
+  database.ref(`${CHAT_ROOT}/${chatKey}/${READ_ANCHOR_ROOT}/${userId}`);
 
 const mapSnapshotToMessages = (snapshot) => {
   const rawMessages = snapshot.val() || {};
@@ -19,38 +22,6 @@ const mapSnapshotToMessages = (snapshot) => {
     .map(([messageId, rawMessage]) => normalizeChatMessage(messageId, rawMessage))
     .sort((left, right) => left.timestamp - right.timestamp);
 };
-
-const sendMessage = async (payload) => {
-  const chatKey = generateChatKey(payload.senderId, payload.receiverId);
-  const messageRef = getMessagesRef(chatKey).push();
-  const receiverIsOnline = await isUserOnline(payload.receiverId);
-
-  const message = normalizeChatMessage(messageRef.key, {
-    ...payload,
-    messageId: messageRef.key,
-    status: receiverIsOnline ? 'DELIVERED' : 'SENT',
-    timestamp: Date.now(),
-  });
-
-  await messageRef.set(message);
-  return message;
-};
-
-const sendTextMessage = async (senderId, receiverId, text) =>
-  sendMessage({
-    senderId,
-    receiverId,
-    message: text,
-    type: 'TEXT',
-  });
-
-const sendMediaMessage = async (senderId, receiverId, mediaUrl, mediaType) =>
-  sendMessage({
-    senderId,
-    receiverId,
-    mediaUrl,
-    type: mediaType,
-  });
 
 const getMessageById = async (chatKey, messageId) => {
   if (!messageId) {
@@ -65,6 +36,71 @@ const getMessageById = async (chatKey, messageId) => {
   return normalizeChatMessage(snapshot.key, snapshot.val());
 };
 
+const getMessageByClientMessageId = async (chatKey, clientMessageId) => {
+  if (!clientMessageId) {
+    return null;
+  }
+
+  const snapshot = await getMessagesRef(chatKey)
+    .orderByChild('clientMessageId')
+    .equalTo(clientMessageId)
+    .limitToFirst(1)
+    .once('value');
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  const [messageId, rawMessage] = Object.entries(snapshot.val() || {})[0] || [];
+  if (!messageId || !rawMessage) {
+    return null;
+  }
+
+  return normalizeChatMessage(messageId, rawMessage);
+};
+
+const sendMessage = async (payload) => {
+  const chatKey = generateChatKey(payload.senderId, payload.receiverId);
+
+  if (payload.clientMessageId) {
+    const existingMessage = await getMessageByClientMessageId(chatKey, payload.clientMessageId);
+    if (existingMessage) {
+      return existingMessage;
+    }
+  }
+
+  const messageRef = getMessagesRef(chatKey).push();
+  const receiverIsOnline = await isUserOnline(payload.receiverId);
+
+  const message = normalizeChatMessage(messageRef.key, {
+    ...payload,
+    messageId: messageRef.key,
+    clientMessageId: payload.clientMessageId || '',
+    status: receiverIsOnline ? 'DELIVERED' : 'SENT',
+    timestamp: Date.now(),
+  });
+
+  await messageRef.set(message);
+  return message;
+};
+
+const sendTextMessage = async (senderId, receiverId, text, clientMessageId = '') =>
+  sendMessage({
+    senderId,
+    receiverId,
+    message: text,
+    type: 'TEXT',
+    clientMessageId,
+  });
+
+const sendMediaMessage = async (senderId, receiverId, mediaUrl, mediaType) =>
+  sendMessage({
+    senderId,
+    receiverId,
+    mediaUrl,
+    type: mediaType,
+  });
+
 const dedupeMessages = (messages) => {
   const seenIds = new Set();
 
@@ -77,6 +113,54 @@ const dedupeMessages = (messages) => {
     seenIds.add(messageId);
     return true;
   });
+};
+
+const getConversationReadAnchor = async (userId, otherUserId) => {
+  const chatKey = generateChatKey(userId, otherUserId);
+  const snapshot = await getReadAnchorRef(chatKey, userId).once('value');
+
+  if (!snapshot.exists()) {
+    return {
+      lastReadMessageId: '',
+      lastReadTimestamp: null,
+      updatedAt: null,
+    };
+  }
+
+  return {
+    lastReadMessageId: String(snapshot.child('lastReadMessageId').val() || ''),
+    lastReadTimestamp: Number(snapshot.child('lastReadTimestamp').val() || 0) || null,
+    updatedAt: Number(snapshot.child('updatedAt').val() || 0) || null,
+  };
+};
+
+const saveConversationReadAnchor = async (
+  userId,
+  otherUserId,
+  { lastReadMessageId = '', lastReadTimestamp = null } = {}
+) => {
+  const chatKey = generateChatKey(userId, otherUserId);
+  let nextTimestamp = Number(lastReadTimestamp || 0) || null;
+  let nextMessageId = String(lastReadMessageId || '');
+
+  if (nextMessageId && !nextTimestamp) {
+    const anchorMessage = await getMessageById(chatKey, nextMessageId);
+    if (anchorMessage) {
+      nextTimestamp = anchorMessage.timestamp;
+      nextMessageId = anchorMessage.messageId;
+    }
+  }
+
+  await getReadAnchorRef(chatKey, userId).set({
+    lastReadMessageId: nextMessageId,
+    lastReadTimestamp: nextTimestamp,
+    updatedAt: Date.now(),
+  });
+
+  return {
+    lastReadMessageId: nextMessageId,
+    lastReadTimestamp: nextTimestamp,
+  };
 };
 
 const loadChatHistoryByUsers = async (userId, otherUserId, limit = 100) => {
@@ -97,11 +181,30 @@ const loadChatHistoryWindowByUsers = async (
   const chatKey = generateChatKey(userId, otherUserId);
   const safeWindowSize = Math.max(1, Math.min(Number(windowSize || 10), 40));
   const safeBatchSize = Math.max(1, Math.min(Number(batchSize || 24), 60));
+  const readAnchor = await getConversationReadAnchor(userId, otherUserId);
+
+  const buildWindowPayload = (messages, hasOlder, hasNewer) => {
+    const unreadCount = messages.filter(
+      (message) =>
+        message.receiverId === userId &&
+        message.senderId === otherUserId &&
+        (!readAnchor.lastReadTimestamp || message.timestamp > readAnchor.lastReadTimestamp)
+    ).length;
+
+    return {
+      messages,
+      hasOlder,
+      hasNewer,
+      readAnchorMessageId: readAnchor.lastReadMessageId,
+      readAnchorTimestamp: readAnchor.lastReadTimestamp,
+      unreadCount,
+    };
+  };
 
   if (beforeMessageId) {
     const boundaryMessage = await getMessageById(chatKey, beforeMessageId);
     if (!boundaryMessage) {
-      return { messages: [], hasOlder: false, hasNewer: true };
+      return buildWindowPayload([], false, true);
     }
 
     const snapshot = await getMessagesRef(chatKey)
@@ -111,17 +214,13 @@ const loadChatHistoryWindowByUsers = async (
       .once('value');
 
     const messages = mapSnapshotToMessages(snapshot);
-    return {
-      messages: messages.slice(-safeBatchSize),
-      hasOlder: messages.length > safeBatchSize,
-      hasNewer: true,
-    };
+    return buildWindowPayload(messages.slice(-safeBatchSize), messages.length > safeBatchSize, true);
   }
 
   if (afterMessageId) {
     const boundaryMessage = await getMessageById(chatKey, afterMessageId);
     if (!boundaryMessage) {
-      return { messages: [], hasOlder: true, hasNewer: false };
+      return buildWindowPayload([], true, false);
     }
 
     const snapshot = await getMessagesRef(chatKey)
@@ -131,11 +230,7 @@ const loadChatHistoryWindowByUsers = async (
       .once('value');
 
     const messages = mapSnapshotToMessages(snapshot);
-    return {
-      messages: messages.slice(0, safeBatchSize),
-      hasOlder: true,
-      hasNewer: messages.length > safeBatchSize,
-    };
+    return buildWindowPayload(messages.slice(0, safeBatchSize), true, messages.length > safeBatchSize);
   }
 
   const anchorMessage = await getMessageById(chatKey, anchorMessageId);
@@ -159,11 +254,7 @@ const loadChatHistoryWindowByUsers = async (
     const afterMessages = mapSnapshotToMessages(afterSnapshot);
     const messages = dedupeMessages([...beforeMessages, ...afterMessages]).slice(-safeWindowSize);
 
-    return {
-      messages,
-      hasOlder: beforeMessages.length > beforeCount,
-      hasNewer: afterMessages.length > 0,
-    };
+    return buildWindowPayload(messages, beforeMessages.length > beforeCount, afterMessages.length > 0);
   }
 
   const latestSnapshot = await getMessagesRef(chatKey)
@@ -172,11 +263,11 @@ const loadChatHistoryWindowByUsers = async (
     .once('value');
 
   const latestMessages = mapSnapshotToMessages(latestSnapshot);
-  return {
-    messages: latestMessages.slice(-safeWindowSize),
-    hasOlder: latestMessages.length > safeWindowSize,
-    hasNewer: false,
-  };
+  return buildWindowPayload(
+    latestMessages.slice(-safeWindowSize),
+    latestMessages.length > safeWindowSize,
+    false
+  );
 };
 
 const buildConversationSummary = async (currentUserId, friend) => {
@@ -185,11 +276,15 @@ const buildConversationSummary = async (currentUserId, friend) => {
     .orderByChild('timestamp')
     .limitToLast(50)
     .once('value');
+  const readAnchor = await getConversationReadAnchor(currentUserId, friend.document_Id);
 
   const messages = mapSnapshotToMessages(snapshot);
   const lastMessage = messages[messages.length - 1] || null;
   const unreadCount = messages.filter(
-    (message) => message.receiverId === currentUserId && message.status !== 'READ'
+    (message) =>
+      message.receiverId === currentUserId &&
+      message.senderId === friend.document_Id &&
+      (!readAnchor.lastReadTimestamp || message.timestamp > readAnchor.lastReadTimestamp)
   ).length;
 
   return {
@@ -206,6 +301,8 @@ const buildConversationSummary = async (currentUserId, friend) => {
     lastMessageStatus: lastMessage?.status || null,
     lastMessageSenderId: lastMessage?.senderId || null,
     lastMessageTimestamp: lastMessage?.timestamp || null,
+    lastReadMessageId: readAnchor.lastReadMessageId,
+    lastReadTimestamp: readAnchor.lastReadTimestamp,
   };
 };
 
@@ -232,7 +329,7 @@ const updateMessageStatus = async (messageId, senderId, receiverId, status) => {
   await getMessagesRef(chatKey).child(messageId).update({ status });
 };
 
-const markConversationAsRead = async (userId, otherUserId) => {
+const markConversationAsRead = async (userId, otherUserId, lastReadMessageId = '') => {
   const chatKey = generateChatKey(userId, otherUserId);
   const snapshot = await getMessagesRef(chatKey)
     .orderByChild('receiverId')
@@ -250,6 +347,24 @@ const markConversationAsRead = async (userId, otherUserId) => {
 
   if (Object.keys(updates).length > 0) {
     await getMessagesRef(chatKey).update(updates);
+  }
+
+  let anchorMessage = null;
+
+  if (lastReadMessageId) {
+    anchorMessage = await getMessageById(chatKey, lastReadMessageId);
+  }
+
+  if (!anchorMessage) {
+    const latestMessages = await loadChatHistoryByUsers(userId, otherUserId, 1);
+    anchorMessage = latestMessages[latestMessages.length - 1] || null;
+  }
+
+  if (anchorMessage) {
+    await saveConversationReadAnchor(userId, otherUserId, {
+      lastReadMessageId: anchorMessage.messageId,
+      lastReadTimestamp: anchorMessage.timestamp,
+    });
   }
 };
 
@@ -291,12 +406,14 @@ const listenForMessages = (userId, otherUserId, onMessage, onError) => {
 };
 
 module.exports = {
+  getConversationReadAnchor,
   getConversationSummaries,
   isUserOnline,
   listenForMessages,
   loadChatHistoryByUsers,
   loadChatHistoryWindowByUsers,
   markConversationAsRead,
+  saveConversationReadAnchor,
   sendMediaMessage,
   sendTextMessage,
   sendTypingIndicator,

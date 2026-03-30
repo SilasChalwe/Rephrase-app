@@ -5,7 +5,8 @@ const sendTextMessage = async (req, res) => {
     const message = await chatService.sendTextMessage(
       req.user.uid,
       req.body.receiverId,
-      req.body.text
+      req.body.text,
+      req.body.clientMessageId
     );
     return res.status(200).json(message);
   } catch (error) {
@@ -77,10 +78,26 @@ const updateMessageStatus = async (req, res) => {
 
 const markConversationAsRead = async (req, res) => {
   try {
-    await chatService.markConversationAsRead(req.user.uid, req.query.id);
+    await chatService.markConversationAsRead(
+      req.user.uid,
+      req.query.id,
+      req.body?.lastReadMessageId || ''
+    );
     return res.status(200).send();
   } catch (error) {
     return res.status(500).json({ message: 'Failed to mark conversation as read.' });
+  }
+};
+
+const saveConversationReadAnchor = async (req, res) => {
+  try {
+    const anchor = await chatService.saveConversationReadAnchor(req.user.uid, req.body.receiverId, {
+      lastReadMessageId: req.body.lastReadMessageId,
+      lastReadTimestamp: req.body.lastReadTimestamp,
+    });
+    return res.status(200).json(anchor);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to save read anchor.' });
   }
 };
 
@@ -148,6 +165,7 @@ module.exports = {
   getChatHistory,
   markConversationAsRead,
   messageStream,
+  saveConversationReadAnchor,
   sendMediaMessage,
   sendTextMessage,
   sendTypingIndicator,

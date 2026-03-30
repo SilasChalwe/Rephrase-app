@@ -7,6 +7,7 @@ const generateChatKey = (uid1, uid2) => {
 
 const normalizeChatMessage = (documentId = '', rawMessage = {}) => ({
   messageId: rawMessage.messageId || documentId,
+  clientMessageId: rawMessage.clientMessageId || '',
   senderId: rawMessage.senderId || '',
   receiverId: rawMessage.receiverId || '',
   message: rawMessage.message || '',

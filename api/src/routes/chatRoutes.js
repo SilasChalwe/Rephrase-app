@@ -6,6 +6,7 @@ const {
   getChatHistory,
   markConversationAsRead,
   messageStream,
+  saveConversationReadAnchor,
   sendMediaMessage,
   sendTextMessage,
   sendTypingIndicator,
@@ -23,6 +24,7 @@ router.get('/messages/stream', messageStream);
 router.get('/messages/:receiverId', getChatHistory);
 router.patch('/messages/:messageId/status', updateMessageStatus);
 router.post('/conversations/read', markConversationAsRead);
+router.post('/conversations/anchor', saveConversationReadAnchor);
 router.get('/presence/:id', checkOnlineStatus);
 router.post('/typing', sendTypingIndicator);
 
