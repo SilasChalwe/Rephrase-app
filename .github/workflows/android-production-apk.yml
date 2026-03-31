@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name for the release (e.g. v1.0.1)"
+        required: true
+        default: "v1.0.1"
 
 permissions:
   contents: write
@@ -23,10 +29,14 @@ jobs:
 
       - name: Add swap space
         run: |
-          sudo fallocate -l 6G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          if sudo swapon --show | grep -q /swapfile; then
+            echo "Swap already active on /swapfile, skipping creation."
+          else
+            sudo fallocate -l 6G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
           free -h
 
       - name: Set up Node.js
@@ -129,16 +139,26 @@ jobs:
             -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
             assembleRelease
 
+      - name: Resolve release tag name
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.tag_name }}" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=v1.0.1" >> "$GITHUB_ENV"
+          fi
+
       - name: Prepare APK artifact
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk release-assets/rephrase-${GITHUB_REF_NAME}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/rephrase-${RELEASE_TAG}.apk
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release
-          path: mobile-app/release-assets/rephrase-${{ github.ref_name }}.apk
+          path: mobile-app/release-assets/rephrase-${{ env.RELEASE_TAG }}.apk
 
   publish-release:
     runs-on: ubuntu-latest
@@ -146,6 +166,16 @@ jobs:
       - build-android
 
     steps:
+      - name: Resolve release tag name
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.tag_name }}" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=v1.0.1" >> "$GITHUB_ENV"
+          fi
+
       - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
@@ -155,8 +185,8 @@ jobs:
       - name: Create GitHub Release and upload mobile artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
           generate_release_notes: true
           files: |
-            release-assets/rephrase-${{ github.ref_name }}.apk
+            release-assets/rephrase-${{ env.RELEASE_TAG }}.apk
