@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - "copilot/fix-yaml-issues"
   workflow_dispatch:
     inputs:
       tag_name:
