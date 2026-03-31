@@ -11,12 +11,6 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        abi:
-          - armeabi-v7a
-          - arm64-v8a
 
     defaults:
       run:
@@ -111,24 +105,24 @@ jobs:
           echo "GRADLE_WORKERS=${WORKERS}" >> "$GITHUB_ENV"
           echo "GRADLE_PARALLEL_FLAG=${PARALLEL_FLAG}" >> "$GITHUB_ENV"
 
-      - name: Build release APK for ${{ matrix.abi }}
+      - name: Build release APK
         working-directory: mobile-app/android
         env:
           GRADLE_OPTS: "-Xmx${{ env.GRADLE_XMX }} -XX:MaxMetaspaceSize=${{ env.GRADLE_METASPACE }} -Dkotlin.daemon.jvm.options=-Xmx${{ env.GRADLE_KOTLIN_XMX }}"
         run: |
           chmod +x ./gradlew
-          ./gradlew ${{ env.GRADLE_PARALLEL_FLAG }} --max-workers=${{ env.GRADLE_WORKERS }} -PreactNativeArchitectures=${{ matrix.abi }} -PreleaseAbi=${{ matrix.abi }} assembleRelease
+          ./gradlew ${{ env.GRADLE_PARALLEL_FLAG }} --max-workers=${{ env.GRADLE_WORKERS }} -PnewArchEnabled=false assembleRelease
 
-      - name: Prepare APK artifact for ${{ matrix.abi }}
+      - name: Prepare APK artifact
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk release-assets/rephrase-${GITHUB_REF_NAME}-${{ matrix.abi }}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/rephrase-${GITHUB_REF_NAME}.apk
 
-      - name: Upload Android artifact for ${{ matrix.abi }}
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release-${{ matrix.abi }}
-          path: mobile-app/release-assets/rephrase-${{ github.ref_name }}-${{ matrix.abi }}.apk
+          name: android-release
+          path: mobile-app/release-assets/rephrase-${{ github.ref_name }}.apk
 
   publish-release:
     runs-on: ubuntu-latest
@@ -139,9 +133,8 @@ jobs:
       - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: android-release-*
+          name: android-release
           path: release-assets
-          merge-multiple: true
 
       - name: Create GitHub Release and upload mobile artifacts
         uses: softprops/action-gh-release@v2
@@ -150,4 +143,4 @@ jobs:
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            release-assets/*.apk
+            release-assets/rephrase-${{ github.ref_name }}.apk
