@@ -108,10 +108,11 @@ jobs:
       - name: Build release APK
         working-directory: mobile-app/android
         env:
+          NODE_ENV: production
           GRADLE_OPTS: "-Xmx${{ env.GRADLE_XMX }} -XX:MaxMetaspaceSize=${{ env.GRADLE_METASPACE }} -Dkotlin.daemon.jvm.options=-Xmx${{ env.GRADLE_KOTLIN_XMX }}"
         run: |
           chmod +x ./gradlew
-          ./gradlew ${{ env.GRADLE_PARALLEL_FLAG }} --max-workers=${{ env.GRADLE_WORKERS }} -PnewArchEnabled=false assembleRelease
+          ./gradlew ${{ env.GRADLE_PARALLEL_FLAG }} --max-workers=${{ env.GRADLE_WORKERS }} -PreactNativeArchitectures=armeabi-v7a,arm64-v8a assembleRelease
 
       - name: Prepare APK artifact
         run: |
