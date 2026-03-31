@@ -23,10 +23,14 @@ jobs:
 
       - name: Add swap space
         run: |
-          sudo fallocate -l 6G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          if sudo swapon --show | grep -q /swapfile; then
+            echo "Swap already active on /swapfile, skipping creation."
+          else
+            sudo fallocate -l 6G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
           free -h
 
       - name: Set up Node.js
